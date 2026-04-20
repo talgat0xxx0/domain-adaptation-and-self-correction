@@ -1,0 +1,7 @@
+transformers
+datasets
+evaluate
+sacrebleu
+bert-score
+sentencepiece
+rouge_score
