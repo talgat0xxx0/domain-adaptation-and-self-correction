@@ -88,3 +88,24 @@ The supervised fine-tuning data should follow the following structure:
   "summary": "Reference summary in Kazakh",
   "source": "xsum_kk"
 }
+
+
+4.1 Software Requirements
+
+Typical software environment:
+
+Python 3.10+
+PyTorch
+Transformers
+Datasets
+PEFT
+TRL
+BitsAndBytes
+Evaluate
+ROUGE-score
+BERTScore
+SacreBLEU
+
+Exact package versions are provided in:
+
+requirements.txt
