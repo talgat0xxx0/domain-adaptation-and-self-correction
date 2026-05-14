@@ -1,11 +1,10 @@
-# -*- coding: utf-8 -*-  #vot1ac23 # klow6667
-import torch  #lalafa
+# -*- coding: utf-8 -*-#vot1ac23 # klow6667
+import torch#lalafa
 import re
 import pandas as pd
 
 from datasets import load_from_disk
-#from transformers import AutoTokenizer, AutoModelForCausalLM
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import AutoTokenizer, AutoModelForCausalLM
 import evaluate
 from peft import PeftModel
 
@@ -13,13 +12,12 @@ from peft import PeftModel
 # PATHS
 # ======================================================
 VAL_DATA    = "/content/gdrive/MyDrive/trns/gpt_dataset"
-#MODEL_PATH  = "/content/gdrive/MyDrive/gemma_baq_pretrained"
-#SAVE_CSV    = "/content/gdrive/MyDrive/llama_eval_results_batched.csv"
-# ВНИМАНИЕ: Здесь должен быть путь к LoRA, обученной именно для Llama-3.1
-#LORA_PATH   = "/content/gdrive/MyDrive/gemma_dapt_sft_v1_25032026/final"
 
 
-MODEL_PATH  = "/content/gdrive/MyDrive/mt5_saved_cleaned"
+
+
+
+MODEL_PATH  = "google/gemma-3-4b-it"
 SAVE_CSV    = "/content/gdrive/MyDrive/llama_eval_results_batched.csv"
 # ВНИМАНИЕ: Здесь должен быть путь к LoRA, обученной именно для Llama-3.1
 #LORA_PATH   = "/content/gdrive/MyDrive/gemma_sft_v1_25032026/final2"
@@ -37,24 +35,23 @@ val_dataset = load_from_disk(VAL_DATA).select(range(200))
 # LOAD TOKENIZER
 # ======================================================
 tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
-#tokenizer.pad_token = tokenizer.eos_token
+tokenizer.pad_token = tokenizer.eos_token
 
 # ======================================================
 # LOAD MODEL (4-bit)
 # ======================================================
-
-model = AutoModelForSeq2SeqLM.from_pretrained(
+model = AutoModelForCausalLM.from_pretrained(
     MODEL_PATH,
     device_map="auto",
-    #torch_dtype=torch.bfloat16,
-    torch_dtype=torch.float16
+    torch_dtype=torch.bfloat16,
+    load_in_4bit=True
 )
 #model = PeftModel.from_pretrained(model, LORA_PATH)
 #model.eval()
 model.eval()
 model.config.use_cache = True
 
-print("🔥 mT5 модель загружена (без LoRA)")
+print("🔥 Gemma модель загружена (без LoRA)")
 
 # ======================================================
 # UTILS
@@ -63,13 +60,6 @@ def clean_text(text: str) -> str:
     text = re.sub(r"[\n\r]+", " ", text)
     text = re.sub(r"\s{2,}", " ", text)
     return text.strip()
-
-def clean_mt5_artifacts(text: str) -> str:
-    text = clean_text(text)
-    text = re.sub(r"<extra_id_\d+>", "", text)
-    text = re.sub(r"\b(summary|kazakh|revised summary|document)\b\s*[:\-]?", "", text, flags=re.IGNORECASE)
-    text = re.sub(r"\s{2,}", " ", text)
-    return text.strip(" :,-.\n\t")
 
 def tokenize(text):
     text = text.lower()
@@ -101,67 +91,138 @@ def bigram_overlap_ratio(doc, summary):
     return overlap / len(sum_bigrams)
 
 def ssbuild_verification_prompt(document: str, summary: str) -> str:
-    return (
-        "check whether the following kazakh summary contains factual errors or hallucinations.\n\n"
-        f"document: {document}\n\n"
-        f"summary: {summary}\n\n"
-        "answer:"
+    return tokenizer.apply_chat_template(
+        [{
+            "role": "user",
+            "content": (
+                "Сен редакторсың. Төмендегі мәтінді және оған жасалған қысқаша мазмұндаманы салыстыр.\n"
+                "Тапсырма: Қысқаша мазмұндамада фактологиялық қателер немесе мәтінде жоқ ақпарат (галлюцинация) бар ма? "
+                "Тексеріп, қысқаша жауап бер (Қате жоқ / Қате табылды: себебі).\n\n"
+                f"Түпнұсқа мәтін: {document}\n\n"
+                f"Генерацияланған мазмұндама: {summary}\n\n"
+                "Тексеру нәтижесі:"
+            )
+        }],
+        tokenize=False,
+        add_generation_prompt=True
+    )
+def build_verification_prompt(document: str, summary: str) -> str:
+    return tokenizer.apply_chat_template(
+        [{
+            "role": "user",
+            "content": (
+                "Сен редакторсың. Төмендегі мәтінді және оған жасалған қысқаша мазмұндаманы салыстыр.\n"
+                "Тапсырма: Қысқаша мазмұндамада фактологиялық қателер немесе мәтінде жоқ ақпарат (галлюцинация) бар ма? "
+                "Тексеріп, қысқаша жауап бер (Қате жоқ / Қате табылды: себебі).\n\n"
+                f"Түпнұсқа мәтін: {document}\n\n"
+                f"Генерацияланған мазмұндама: {summary}\n\n"
+                "Тексеру нәтижесі:"
+            )
+        }],
+        tokenize=False,
+        add_generation_prompt=True
     )
 
-def build_verification_prompt(document: str, summary: str) -> str:
-    return (
-        "check whether the following kazakh summary contains factual errors or hallucinations.\n\n"
-        f"document: {document}\n\n"
-        f"summary: {summary}\n\n"
-        "answer:"
-    )
+
+
+
+
+
+
+
+
+
+
+
+
 
 def build_refinement_prompt(document: str, initial_summary: str) -> str:
-    return (
-        "correct the kazakh summary. fix factual and grammatical errors. do not add new information.\n\n"
-        f"document: {document}\n\n"
-        f"summary: {initial_summary}\n\n"
-        "corrected summary:"
+    return tokenizer.apply_chat_template(
+        [{
+            "role": "user",
+            "content": (
+                "Сен редакторсың.\n\n"
+
+                "Тапсырма:\n"
+                "Тек бастапқы мазмұндаманы түзет. Қайта жазба.\n\n"
+
+                "ҚАТАҢ ЕРЕЖЕЛЕР:\n"
+                "1. Тек қате немесе дәл емес бөліктерді түзет.\n"
+                "2. Егер қате болмаса — мәтінді өзгеріссіз қалдыр.\n"
+                "3. Жаңа ақпарат ҚОСПА.\n"
+                "4. Түпнұсқада жоқ факт енгізбе.\n"
+                "5. Атаулар, сандар, нәтижелер өзгермесін.\n"
+                "6. Бастапқы сөйлем құрылымын сақта.\n\n"
+
+                "ТЫЙЫМ САЛЫНАДЫ:\n"
+                "- Толық қайта жазу\n"
+                "- Түсініктеме беру\n"
+                "- \"Жақсартылған мазмұндама\", \"Түзетілді\" сияқты сөздер жазу\n"
+                "- Себеп түсіндіру\n\n"
+
+                "ФОРМАТ:\n"
+                "- Тек 2–3 сөйлем\n"
+                "- Тек финалдық мазмұндама\n"
+                "- Ешқандай қосымша мәтінсіз\n\n"
+
+                f"Мәтін:\n{document}\n\n"
+                f"Мазмұндама:\n{initial_summary}\n\n"
+
+                "Жауап:"
+            )
+        }],
+        tokenize=False,
+        add_generation_prompt=True
     )
 
-def ssssssssssssssbuild_prompt(document: str) -> str:
-    return (
-        "summarize the following news article in kazakh language.\n\n"
-        f"{document}\n\n"
-        "summary:"
-    )
+
+
+
+
+
 
 def build_prompt(document: str) -> str:
-    return (
-        "summarize the following text in kazakh.\n"
-        "important: do not copy sentences from the original text. "
-        "write an abstractive summary in your own words in 2-3 sentences.\n\n"
-        f"text: {document}\n\n"
-        "summary:"
+    return tokenizer.apply_chat_template(
+        [{
+            "role": "user",
+            "content": (
+                "Төмендегі мәтінге абстрактілі қысқаша мазмұндама жаса.\n"
+                "МАҢЫЗДЫ: Мәтіндегі сөйлемдерді сөзбе-сөз көшірме. "
+                "Өз сөзіңмен, редакторлық стильде негізгі ойды 2-3 сөйлеммен жеткіз.\n\n"
+                f"{document}\n\nҚысқаша мазмұны:"
+            )
+        }],
+        tokenize=False,
+        add_generation_prompt=True
     )
+
+
 
 # ======================================================
 # GENERATION CONFIG
 # ======================================================
 gen_cfg = dict(
-    max_new_tokens=60,
+    max_new_tokens=100,#MAX_NEW,
+    #temperature=0.1,
     num_beams=4,
     do_sample=False,
-    no_repeat_ngram_size=3
+    repetition_penalty=1.2,
+
+    eos_token_id=tokenizer.eos_token_id,
+    pad_token_id=tokenizer.eos_token_id
 )
+
+
+
 
 gen_cfg2 = dict(
-    max_new_tokens=60,
-    num_beams=4,
-    do_sample=False,
-    no_repeat_ngram_size=3
+    max_new_tokens=100,
+    temperature=0.3,
+    do_sample=True,
+    num_beams=1,
+    top_p=0.9,
+    repetition_penalty=1.15,
 )
-
-# bad words for mt5 sentinel tokens
-bad_words_ids = tokenizer(
-    [f"<extra_id_{i}>" for i in range(100)],
-    add_special_tokens=False
-).input_ids
 
 # ======================================================
 # BATCHED GENERATION
@@ -186,17 +247,16 @@ for start in range(0, len(val_dataset), BATCH_SIZE):
     ).to(model.device)
 
     with torch.no_grad():
-        outputs = model.generate(
-            **enc,
-            **gen_cfg,
-            bad_words_ids=bad_words_ids
-        )
+        outputs = model.generate(**enc, **gen_cfg)
+
+    prompt_len = enc["input_ids"].shape[1]
+    generated_ids = outputs[:, prompt_len:]
 
     decoded = tokenizer.batch_decode(
-        outputs,
+        generated_ids,
         skip_special_tokens=True
     )
-    decoded = [clean_mt5_artifacts(x) for x in decoded]
+    decoded = [clean_text(x) for x in decoded]
 
     preds.extend(decoded)
     refs.extend(refs_batch)
@@ -205,6 +265,12 @@ for start in range(0, len(val_dataset), BATCH_SIZE):
     print(f"✔ {min(start + BATCH_SIZE, len(val_dataset))}/{len(val_dataset)}")
 
 print("✔ Генерация завершена")
+
+
+
+
+
+
 
 # ======================================================
 # ВТОРОЙ ПРОХОД: ПРОВЕРКА (Verification)
@@ -229,20 +295,17 @@ for start in range(0, len(docs), BATCH_SIZE):
     ).to(model.device)
 
     with torch.no_grad():
-        r_outputs = model.generate(
-            **enc_r,
-            **gen_cfg2,
-            bad_words_ids=bad_words_ids
-        )
+        r_outputs = model.generate(**enc_r, **gen_cfg2)#r_outputs = model.generate(**enc_r, **gen_cfg)
 
-    r_decoded = tokenizer.batch_decode(r_outputs, skip_special_tokens=True)
+    r_prompt_len = enc_r["input_ids"].shape[1]
+    r_decoded = tokenizer.batch_decode(r_outputs[:, r_prompt_len:], skip_special_tokens=True)
 
     #final_preds.extend([clean_text(x) for x in r_decoded])
     # --- ВОТ ЗДЕСЬ ВСТАВЛЯЕМ ОЧИСТКУ ---
     batch_cleaned = []
     for x in r_decoded:
         # 1. Базовая чистка (пробелы, переносы из твоей функции clean_text)
-        text = clean_mt5_artifacts(x)
+        text = clean_text(x)
 
         # 2. Удаляем "вежливые" слова-артефакты в конце предложения
         # Регулярка ищет слова Жақсы, Түзетілді и т.д. только в самом конце строки ($)
@@ -256,6 +319,7 @@ for start in range(0, len(docs), BATCH_SIZE):
     print(f"✨ Исправлено: {min(start + BATCH_SIZE, len(docs))}/{len(docs)}")
 
 print("✔ Весь процесс завершен")
+
 
 # ======================================================
 # EXTRACTIVENESS ANALYSIS (INITIAL vs FINAL)
@@ -274,6 +338,8 @@ for d, s_init, s_final in zip(docs, preds, final_preds):
 print("\n📊 EXTRACTIVENESS COMPARISON")
 print(f"Initial → token: {sum(tok_init)/len(tok_init):.3f}, bigram: {sum(bi_init)/len(bi_init):.3f}")
 print(f"Final   → token: {sum(tok_final)/len(tok_final):.3f}, bigram: {sum(bi_final)/len(bi_final):.3f}")
+
+
 
 # ======================================================
 # SAVE CSV
@@ -316,6 +382,13 @@ pd.DataFrame({
 }).to_csv(SAVE_CSV, index=False)
 
 print(f"\n✅ Результаты сохранены в: {SAVE_CSV}")
+
+
+
+
+
+
+
 
 # ======================================================
 # СРАВНИТЕЛЬНЫЙ АНАЛИЗ МЕТРИК (ДО И ПОСЛЕ REFINEMENT)
