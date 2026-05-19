@@ -82,7 +82,7 @@ These materials are sufficient to reproduce the experimental pipeline using the 
 
 The supervised fine-tuning data should follow the following structure:
 
-```json
+
 {
   "document": "Source article text in Kazakh",
   "summary": "Reference summary in Kazakh",
