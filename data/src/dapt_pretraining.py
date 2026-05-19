@@ -11,7 +11,7 @@ from datasets import load_dataset
 import torch
 
 MODEL_NAME = "google/gemma-3-4b-it"
-OUT_DIR    = "/content/gdrive/MyDrive/gemma_baq_pretrained"
+OUT_DIR    = "model_dir"
 
 # === Загружаем dataset ===
 ds = load_dataset("json", data_files="/content/gdrive/MyDrive/baq_clean.jsonl")
