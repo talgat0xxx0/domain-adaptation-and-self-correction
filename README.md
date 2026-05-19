@@ -109,3 +109,9 @@ SacreBLEU
 Exact package versions are provided in:
 
 requirements.txt
+
+## Base Model
+
+This model is derived from [`google/gemma-3-4b-it`](https://huggingface.co/google/gemma-3-4b-it).
+
+The model was further adapted using domain-adaptive pretraining (DAPT) on Kazakh news data.
