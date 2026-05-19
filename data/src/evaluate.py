@@ -47,7 +47,7 @@ model = AutoModelForCausalLM.from_pretrained(
     load_in_4bit=True
 )
 #model = PeftModel.from_pretrained(model, LORA_PATH)
-#model.eval()
+
 model.eval()
 model.config.use_cache = True
 
