@@ -115,3 +115,9 @@ requirements.txt
 This model is derived from [`google/gemma-3-4b-it`](https://huggingface.co/google/gemma-3-4b-it).
 
 The model was further adapted using domain-adaptive pretraining (DAPT) on Kazakh news data.
+
+
+## finetuning
+install all required dependencies from requirements.txt
+Before running `data/src/gemma_sft_train.py`, make sure to specify:- the baseline model to be fine-tuned;- the output directory where the fine-tuned model will be saved.
+data/src/gemma_sft_train.py script for model finetuning. 
